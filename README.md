@@ -43,3 +43,5 @@ This role is distributed in the hope that it will be useful, but WITHOUT ANY WAR
 
 - Juan Antonio Valiño García.
 - José Enrique Mourón Regueira
+- Sébastien CAPOU (SII Toulouse)
+- Sébastien SAVARY (SII Toulouse)

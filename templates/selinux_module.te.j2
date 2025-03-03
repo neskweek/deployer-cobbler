@@ -1,14 +1,60 @@
 {{ ansible_managed | comment }}
 
-module {{ cobbler_selinux_patch_module_name }} 1.0;
+module {{ cobbler_selinux_patch_module_name }} {{ now().strftime('%Y%m%d%H%M%S') }};
 
 require {
-        type httpd_config_t;
+        type cobbler_etc_t;
         type cobblerd_t;
-        class dir search;
+        type cobbler_var_lib_t;
+        type dhcp_etc_t;
+        type dhcpd_t;
+        type dnsmasq_etc_t;
+        type dosfs_t;
+        type etc_t;
+        type fsadm_exec_t;
+        type httpd_config_t;
+        type init_exec_t;
+        type init_t;
+        type lib_t;
+        type syslogd_var_run_t;
+        type systemd_unit_file_t;
+        type tftpd_t;
+        type tftpdir_rw_t;
+
+        
+        class dir { add_name lock read remove_name search setattr write };
+        class file { create execute execute_no_trans getattr lock map open read rename unlink write };
+        class lnk_file read;
         class capability dac_override;
+        class system {start stop reload};
 }
 
 #============= cobblerd_t ==============
+allow cobblerd_t cobbler_etc_t:file unlink;
+allow cobblerd_t dhcp_etc_t:dir { add_name write };
+allow cobblerd_t dhcp_etc_t:file create;
+allow cobblerd_t dnsmasq_etc_t:file {create read write};
+allow cobblerd_t dosfs_t:dir read;
+allow cobblerd_t dosfs_t:file { getattr open read };
+allow cobblerd_t etc_t:file { create rename unlink write };
+allow cobblerd_t fsadm_exec_t:file { execute execute_no_trans getattr open read };
+allow cobblerd_t lib_t:dir { search write add_name remove_name};
 allow cobblerd_t httpd_config_t:dir search;
 allow cobblerd_t self:capability dac_override;
+allow cobblerd_t init_exec_t:file getattr;
+allow cobblerd_t init_t:system {start stop reload};
+
+#============= dhcpd_t ==============
+allow dhcpd_t cobbler_etc_t:file { getattr open read };
+
+#!!!! This avc can be allowed using the boolean 'domain_can_mmap_files'
+allow dhcpd_t cobbler_etc_t:file map;
+
+
+#============= tftpd_t ==============
+
+#!!!! This avc can be allowed using the boolean 'tftp_home_dir'
+allow tftpd_t cobbler_etc_t:file { getattr lock open read };
+
+#!!!! This avc can be allowed using the boolean 'tftp_home_dir'
+allow tftpd_t cobbler_var_lib_t:dir { lock read };

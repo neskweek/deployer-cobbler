@@ -1,0 +1,15 @@
+---
+#Patch two files from cobbler v3.3 to be able to import ESX iso images to cobbler
+- name: Comment out lines 572-578 in import_signatures.py (FIX COBBLER v3.3)
+  become: yes
+  shell: "sed -i '572,578{/^[[:space:]]*#/! s/^/#/}' /usr/lib/python3.9/site-packages/cobbler/modules/managers/import_signatures.py"
+  when: (cobbler_version | first) is version('3.3', '>=')
+  notify:
+    - restart cobblerd
+
+- name: Comment out lines 166-170 in distro.py (FIX COBBLER v3.3)
+  become: yes
+  shell: "sed -i '166,170{/^[[:space:]]*#/! s/^/#/}' /usr/lib/python3.9/site-packages/cobbler/items/distro.py"
+  when: (cobbler_version | first) is version('3.3', '>=')
+  notify:
+    - restart cobblerd

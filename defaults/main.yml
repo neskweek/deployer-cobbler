@@ -29,7 +29,10 @@ cobbler_auth_token_expiration: 3600
 
 cobbler_autoinstall_snippets_dir: /var/lib/cobbler/snippets
 cobbler_autoinstall_templates_dir: /var/lib/cobbler/templates
+# Cobbler  version < 3.3
 cobbler_default_autoinstall: /var/lib/cobbler/templates/default.ks
+# Cobbler  version >= 3.3
+cobbler_autoinstall: default.ks
 
 cobbler_boot_loader_conf_template_dir: "/etc/cobbler/boot_loader_conf"
 
@@ -61,11 +64,14 @@ cobbler_default_password_crypted: $1$hZtCu.xn$OcfOoLF7907a.3rd73PqK1
 cobbler_default_template_type: cheetah
 
 cobbler_default_virt_bridge: xenbr0
-cobbler_default_virt_file_size: 5
+cobbler_default_virt_file_size: 5.0
 cobbler_default_virt_ram: 512
 cobbler_default_virt_type: xenpv
 
+# Cobbler  version < 3.3
 cobbler_enable_gpxe: no
+# Cobbler  version >= 3.3
+cobbler_enable_ipxe: false
 
 cobbler_enable_menu: yes
 
@@ -104,9 +110,9 @@ cobbler_manage_dhcp: no
 cobbler_manage_dns: no
 cobbler_bind_chroot_path: '""'
 cobbler_bind_master: 127.0.0.1
-cobbler_manage_tftpd: no
+cobbler_manage_tftpd: yes
 cobbler_tftpboot_location: "/var/lib/tftpboot"
-cobbler_manage_rsync: no
+cobbler_manage_rsync: yes
 cobbler_manage_forward_zones: []
 cobbler_manage_reverse_zones: []
 cobbler_next_server: "{{ ansible_facts.default_ipv4.address }}"
@@ -189,8 +195,8 @@ cobbler_get_loaders: no
 cobbler_module_authentication: authentication.configfile
 cobbler_module_hash_algorithm: sha3_512
 cobbler_module_authorization: authorization.allowall
-cobbler_module_dhcp: managers.dnsmasq
-cobbler_module_dns: managers.dnsmasq
+cobbler_module_dhcp: managers.isc # managers.isc or managers.dnsmasq 
+cobbler_module_dns: managers.bind #managers.dnsmasq or managers.bind
 cobbler_module_tftpd: managers.in_tftpd
 
 # List of dicts with the cobbler signatures to manage. The dict has the same
@@ -338,7 +344,6 @@ cobbler_selinux_mod_file_path: "/tmp/{{cobbler_selinux_patch_module_name}}.mod"
 cobbler_selinux_pp_file_path: "/tmp/{{cobbler_selinux_patch_module_name}}.pp"
 
 # Cobbler selinux booleans
-
 cobbler_selinux_booleans:
   - cobbler_anon_write
   - cobbler_can_network_connect

@@ -4,7 +4,11 @@
 galaxy_info:
   role_name: cobbler
   namespace: amtega
-  author: Juan Antonio Valiño García / José Enrique Mourón Regueira
+  author: 
+    - Juan Antonio Valiño García 
+    - José Enrique Mourón Regueira
+    - Sébastien CAPOU 
+    - Sébastien SAVARY
   description: Setup a cobbler server
   company: AMTEGA - Xunta de Galicia
   license: GPLv3 or EUPL
@@ -13,6 +17,7 @@ galaxy_info:
     - name: EL
       versions:
         - 8
+        - 9
   galaxy_tags:
     - system
     - cobbler

@@ -58,29 +58,77 @@
     - name: Flush handlers
       meta: flush_handlers
 
+    - name: Process ESXi-specific tasks per distro
+      include_tasks: esxi.yml
+      loop: "{{ _cobbler_updated_distros.values() | list }}"
+      loop_control:
+        loop_var: cobbler_distro
+        label: "{{ cobbler_distro.name }}"
+      when: cobbler_distro.name is search("(?i)(esx|vmware)")
+
     - name: Import distros
       command: >-
         cobbler import
         --name={{ cobbler_distro.name }}
         --path={{ cobbler_iso_mount_dir }}/{{ cobbler_distro.artifact.file }}
+        {% if cobbler_distro.arch is defined and cobbler_distro.arch | trim %}
+        --arch={{ cobbler_distro.arch }}
+        {% endif %}
       register: cobbler_import_result
       loop: "{{ _cobbler_updated_distros.values() | list }}"
       loop_control:
         loop_var: cobbler_distro
         label: "{{ cobbler_distro.name }}"
 
+    - name: Check if grubx64.efi exists in the ISO mount directory
+      stat:
+        path: "{{ cobbler_iso_mount_dir }}/{{ cobbler_distro.artifact.file }}/EFI/BOOT/grubx64.efi"
+      register: grubx64_stat
+      loop: "{{ _cobbler_updated_distros.values() | list }}"
+      loop_control:
+        loop_var: cobbler_distro
+        index_var: idx
+        label: "{{ cobbler_distro.name }}"
+
+    - name: Set grubx64_source if file found in any distro mount directory
+      set_fact:
+        grubx64_source: "{{ (grubx64_stat.results | selectattr('stat.exists', 'equalto', True) | list)[0].invocation.module_args.path }}"
+      when: (grubx64_stat.results | selectattr('stat.exists', 'equalto', True) | list) | length > 0
+      run_once: true
+
+    - name: Copy grubx64.efi to /var/lib/cobbler/grub_config/grub/ if found
+      copy:
+        src: "{{ grubx64_source }}"
+        dest: "/var/lib/cobbler/grub_config/grub/grubx64.efi"
+        mode: '0666'
+        remote_src: yes
+      when: grubx64_source is defined
+      run_once: true
+
+
+    ####
+    ### TODO : CAN'T FIND WHERE THIS FILE  GETS CREATED IN THE FIRST PLACE
+    ### the if cobbler_distro.name is search("(?i)(esx|vmware)") to counteract the addition of a 
+    ### file template coming from bootcfg_esxi70.template.j2. But I can't find where it gets 
+    ### added to template-file upon import
+    ####
     - name: Add autoinstall-meta attributes to distros config
       command: >-
         cobbler distro edit
         --name={{ cobbler_distro.name }}
-        --autoinstall-meta='iso_file={{ cobbler_distro.artifact.file }}'
-      when: cobbler_import_result.results[cobbler_distro_index] is changed
+        --autoinstall-meta='tree=http://@@http_server@@/cblr/links/{{ cobbler_distro.name }} iso_file={{ cobbler_distro.artifact.file }}'
+        {% if cobbler_distro.name is search("(?i)(esx|vmware)") %}
+        --template-files=""
+        {% endif %} 
+      when: 
+        - cobbler_import_result.results[cobbler_distro_index] is changed
       register: cobbler_add_ksmeta_result
       loop: "{{ _cobbler_updated_distros.values() | list }}"
       loop_control:
         loop_var: cobbler_distro
         index_var: cobbler_distro_index
         label: "{{ cobbler_distro.name }}"
+
 
     - name: Umount distros ISO files from temporary directories
       mount:
@@ -99,6 +147,7 @@
       loop_control:
         loop_var: cobbler_iso_file
 
+    ## TODO:  This seems problematic, needs more testing
     - include_tasks: clean.yml
       when:
         - artifact_result is defined

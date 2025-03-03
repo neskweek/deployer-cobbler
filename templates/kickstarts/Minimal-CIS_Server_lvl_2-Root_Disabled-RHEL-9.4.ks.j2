@@ -1,0 +1,117 @@
+#version=RHEL9
+
+# Use graphical install - TODO filesystem values to transform to ansible inventory  dict var
+graphical
+
+
+$yum_repo_stanza
+$SNIPPET('network_config')
+
+%pre
+$SNIPPET('autoinstall_start')
+$SNIPPET('pre_install_network_config')
+$SNIPPET('pre_anamon')
+%end
+
+%packages
+@^server-product-environment
+@container-management
+aide
+audit
+firewalld
+libselinux
+nftables
+openscap
+openscap-scanner
+rsyslog
+scap-security-guide
+sudo
+-avahi
+-bind
+-cups
+-cyrus-imapd
+-dhcp-server
+-dnsmasq
+-dovecot
+-ftp
+-gdm
+-httpd
+-mcstrans
+-net-snmp
+-nginx
+-openldap-clients
+-rsync-daemon
+-samba
+-setroubleshoot
+-squid
+-telnet
+-telnet-server
+-tftp
+-tftp-server
+-vsftpd
+-xorg-x11-server-common
+%end
+
+
+
+# Keyboard layouts
+keyboard --vckeymap=fr --xlayouts='fr (oss_latin9)','us'
+# System language  - TODO to transform to ansible inventory
+lang en_US.UTF-8
+
+
+# Run the Setup Agent on first boot
+firstboot --enable
+
+# Generated using Blivet version 3.6.0 # TODO filesystem values to transform to ansible inventory  dict var
+ignoredisk --only-use=sda
+# Partition clearing information
+clearpart --all --initlabel
+# Disk partitioning information # TODO filesystem values to transform to ansible inventory  dict var
+part /boot              --size=1024         --fstype="xfs"   --asprimary --ondisk=sda  
+part /boot/efi          --size=1024         --fstype="efi"   --asprimary --ondisk=sda
+part pv.system          --size=1    --grow  --fstype="lvmpv" --asprimary --ondisk=sda 
+
+
+volgroup system         --pesize=4096       pv.system
+logvol /home            --size=50680        --fstype="xfs"  --name=home          --vgname=system
+logvol /var/tmp         --size=10240        --fstype="xfs"  --name=var_tmp       --vgname=system
+logvol /opt             --size=50680        --fstype="xfs"  --name=opt           --vgname=system
+logvol /var             --size=50680        --fstype="xfs"  --name=var           --vgname=system
+logvol /var/log         --size=50680        --fstype="xfs"  --name=var_log       --vgname=system
+logvol /tmp             --size=10240        --fstype="xfs"  --name=tmp           --vgname=system
+logvol swap             --size=32148        --fstype="swap" --name=swap          --vgname=system
+logvol /var/log/audit   --size=15360        --fstype="xfs"  --name=var_log_audit --vgname=system
+logvol /                --size=1024  --grow --fstype="xfs"  --name=root          --vgname=system
+
+# System timezone - TODO filesystem values to transform to ansible inventory  dict var
+timezone Europe/Paris --utc
+
+# Root password
+rootpw  --iscrypted     --lock 
+#passwd: deployer - TODO => use a task to encode a vaulted value
+user    --name=deployer --groups=wheel --password=$6$SRG9nc0qcBi2ckQi$RMH4UI24RCSFmXn4PcdWLoAjWtk1G0nyg1n2a8IhVuuANAHxLmcHmS6QF.YuyyyQprWC5TVkPWJdoKJJk4xPq/ --iscrypted --gecos="deployer"
+# TODO :  add condition to check if ansible_ssh_key exists
+sshkey  --username=deployer "$ansible_ssh_key"
+
+%addon com_redhat_kdump --enable --reserve-mb='auto'
+%end
+
+
+%post
+$SNIPPET('post_install_kernel_options')
+$SNIPPET('post_install_network_config')
+$yum_config_stanza
+$SNIPPET('post_anamon')
+$SNIPPET('autoinstall_done')
+rm /etc/yum.repos.d/R*
+%end
+
+%addon com_redhat_oscap
+    content-type = scap-security-guide
+    datastream-id = scap_org.open-scap_datastream_from_xccdf_ssg-rhel9-xccdf.xml
+    xccdf-id = scap_org.open-scap_cref_ssg-rhel9-xccdf.xml
+    profile = xccdf_org.ssgproject.content_profile_cis
+%end
+
+reboot

@@ -4,7 +4,7 @@
 - block:
     - name: Enable cobble module in dnf
       command: dnf module enable cobbler:3 -y
-      when: ansible_facts.distribution_major_version is version("8", ">=")
+      when: ansible_facts.distribution_major_version is version("8", "=")
       register: cobbler_dnf_module_result
       changed_when: >-
         cobbler_dnf_module_result.stdout is not search("Nothing to do.")
@@ -12,6 +12,19 @@
         cobbler_dnf_module_result.stdout is not search("Complete!")
       environment:
         LANGUAGE: en_US
+
+    - name: Check available cobbler version
+      command: "dnf info cobbler"
+      register: cobbler_info
+      changed_when: false
+
+    - name: Extract cobbler version
+      set_fact:
+        cobbler_version: "{{ (cobbler_info.stdout | regex_search('Version\\s*:\\s*([0-9]+(?:\\.[0-9]+)+)', '\\1')) | default('0.0') | trim }}"
+
+    - name: Debug cobbler version
+      debug:
+        msg: "Extracted cobbler version: {{ cobbler_version }}"
 
     - name: Setup packages
       include_role:
@@ -21,10 +34,12 @@
           all:
             all:
               cobbler: present
-              cobbler-web: present
+              cobbler-web: "{{ 'absent' if ((cobbler_version | first) is version('3.3', '>=')) else 'present' }}"
               curl: present
               debmirror: present
               hostname: present
+              dnsmasq: "{{ 'absent' if ( not (cobbler_manage_dhcp | bool or cobbler_module_dhcp == 'managers.dnsmasq') and not cobbler_manage_dns | bool) else 'present' }}"
+              dhcp-server: "{{ 'absent' if ( not (cobbler_manage_dhcp | bool and cobbler_module_dhcp == 'managers.isc'))  else 'present' }}"
               httpd: present
               mod_ssl: present
               pykickstart: present
@@ -40,6 +55,43 @@
         state: started
         enabled: yes
       when: ansible_facts.distribution_major_version is version("8", ">=")
+
+    - name: Partial population of ISC DHCP template
+      template:
+        src: dhcp.template.j2
+        dest: /etc/cobbler/dhcp.template
+        owner: root
+        group: root
+        mode: '0644'
+      when: (cobbler_manage_dhcp | bool) and (cobbler_module_dhcp == "managers.isc")
+
+    - name: Partial population of Grub template
+      template:
+        src: boot_loader_conf/grub.cfg.j2
+        dest: /var/lib/cobbler/templates/
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Partial population of Grub template
+      template:
+        src: kickstarts/Minimal-CIS_Server_lvl_2-Root_Disabled-RHEL-9.4.ks.j2
+        dest: /var/lib/cobbler/templates/
+        owner: root
+        group: root
+        mode: '0644'
+  
+    ## Doesn't work 
+    - name: Partial population of all kickstarts
+      template:
+        src: "{{ item }}"
+        dest: "/var/lib/cobbler/templates/{{ item | basename | regex_replace('\\.j2$', '') }}"
+        owner: root
+        group: root
+        mode: '0644'
+      with_fileglob:
+        - "{{ role_path }}/templates/kickstarts/*.ks.j2"
+
 
     - name: Create config directories
       file:

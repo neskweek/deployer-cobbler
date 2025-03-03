@@ -3,6 +3,7 @@
 
 - block:
     - include_tasks: clean.yml
+    - include_tasks: fix_ESXi_import_bug_v3.3.yml
     - include_tasks: import.yml
   tags:
     - role::cobbler

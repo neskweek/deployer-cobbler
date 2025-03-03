@@ -2,22 +2,113 @@
 # Add systems
 
 - block:
+    - name: Enrich cobbler systems with interfaces from host_vars
+      set_fact:
+        enriched_cobbler_systems: "{{ enriched_cobbler_systems | 
+                                      default([]) + [ 
+                                                      cobbler_system | 
+                                                      combine({'interfaces': (hostvars[cobbler_system.name].interfaces
+                                                                              if (hostvars[cobbler_system.name] is defined 
+                                                                                  and hostvars[cobbler_system.name].interfaces is defined)
+                                                                              else {}) ,
+                                                               'hostname': (hostvars[cobbler_system.name].hostname
+                                                                            if (hostvars[cobbler_system.name] is defined 
+                                                                                  and hostvars[cobbler_system.name].hostname is defined)
+                                                                              else inventory_hostname ) ,
+                                                              }) 
+                                                    ] 
+                                  }}"
+      loop: "{{ _cobbler_updated_systems.values() | list }}"
+      loop_control:
+        loop_var: cobbler_system
+
     - name: Add systems
-      command: >-
-        cobbler system add
-        --name={{ cobbler_system.name }}
-        --profile={{ cobbler_system.profile }}
-        --kernel-options="{{ cobbler_system.kopts | default([]) | join(' ') }}"
-      register: cobbler_system_add_result
+      community.general.cobbler_system:
+        host: "{{ hostvars[target_hosts].hostname }}"
+        use_ssl: false
+        validate_certs: false
+        username: cobbler
+        password: cobbler
+        name: "{{ hostvars[cobbler_system.name].hostname }}"
+        properties:
+          name: "{{ cobbler_system.name }}"
+          hostname: "{{ hostvars[cobbler_system.name].hostname }}"
+          profile: "{{ cobbler_system.profile }}"
+          netboot_enabled: true
+          ### TODO
+          #autoinstall: "{{ hostvars[cobbler_system.name].cobbler_kickstart | d(omit)}}" # => cobbler needs a host dict var holder
+          autoinstall_meta: >-
+            ip='
+              {% if hostvars[cobbler_system.name].interfaces.admin is defined %}
+                {{ hostvars[cobbler_system.name].interfaces.admin.ipaddress }}
+              {% elif hostvars[cobbler_system.name].interfaces.vmnic0 is defined %}
+                {{ hostvars[cobbler_system.name].interfaces.vmnic0.ipaddress }}
+              {% else %}
+                {{ (hostvars[cobbler_system.name].interfaces | dict2items | first).value.ipaddress }}
+              {% endif %}
+            {% if ansible_ssh_key is defined %}
+            ansible_ssh_key='{{ ansible_ssh_key_content }}
+            {% endif %}
+            '
+          kernel_options: "{{ cobbler_system.kopts | default([]) | join(' ') }}"
+          ### TODO
+          # filename: "{{ hostvars[cobbler_system.name].pxe_filename | d(omit)}}" # => cobbler needs a host dict var holder
+          ## FOR ESXI 
+          # filename: "esxi/system/{{ path_tftp_boot }}/mboot.efi"  # DONE in esxi.yaml => needs  path_tftp_boot
+          ###############
+          next_server: "{{ cobbler_next_server }}"
+          name_servers: >-
+            {% if hostvars[cobbler_system.name].interfaces is defined %}
+              {% if hostvars[cobbler_system.name].interfaces.admin is defined and
+                    'name_servers' in hostvars[cobbler_system.name].interfaces.admin %}
+                {{ hostvars[cobbler_system.name].interfaces.admin.name_servers | join(' ') }}
+              {% elif hostvars[cobbler_system.name].interfaces.vmnic0 is defined and
+                      'name_servers' in hostvars[cobbler_system.name].interfaces.vmnic0 %}
+                {{ hostvars[cobbler_system.name].interfaces.vmnic0.name_servers | join(' ') }}
+              {% else %}
+                {# Fallback: try to use the first defined interface’s name_servers, if present #}
+                {{ (hostvars[cobbler_system.name].interfaces | dict2items | first).value.name_servers | default('') | join(' ') }}
+              {% endif %}
+            {% else %}
+              {{ omit }}
+            {% endif %}
+          name_servers_search: >-
+            {% if hostvars[cobbler_system.name].interfaces is defined %}
+              {% if hostvars[cobbler_system.name].interfaces.admin is defined and
+                    'name_servers_search' in hostvars[cobbler_system.name].interfaces.admin %}
+                {{ hostvars[cobbler_system.name].interfaces.admin.name_servers_search | join(' ') }}
+              {% elif hostvars[cobbler_system.name].interfaces.vmnic0 is defined and
+                      'name_servers_search' in hostvars[cobbler_system.name].interfaces.vmnic0 %}
+                {{ hostvars[cobbler_system.name].interfaces.vmnic0.name_servers_search | join(' ') }}
+              {% else %}
+                {# Fallback: try to use the first defined interface’s name_servers_search, if present #}
+                {{ (hostvars[cobbler_system.name].interfaces | dict2items | first).value.name_servers_search | default('') | join(' ') }}
+              {% endif %}
+            {% else %}
+              {{ omit }}
+            {% endif %}
+        interfaces: "{{ cobbler_system.interfaces }}"
       loop: >-
-        {{ _cobbler_updated_systems.values()
+        {{ enriched_cobbler_systems
            | selectattr("state", "defined")
            | selectattr("state", "equalto", "present")
            | list }}
       loop_control:
         loop_var: cobbler_system
         label: "{{ cobbler_system.name }}"
+      register: cobbler_system_add_result
+
+    - name: Process ESXi-specific tasks per systems
+      include_tasks: esxi.yml
+      loop:  "{{ enriched_cobbler_systems | selectattr('state', 'defined') | selectattr('state', 'equalto', 'present') | list }}"
+      loop_control:
+        loop_var: cobbler_system
+        label: "{{ cobbler_system.name }}"
+      when: cobbler_system.profile is search("(?i)(esx|vmware)")
+
   tags:
     - role::cobbler
     - role::cobbler::configure
     - role::cobbler::configure::systems
+
+

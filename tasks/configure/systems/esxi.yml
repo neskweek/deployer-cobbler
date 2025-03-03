@@ -1,0 +1,91 @@
+- name: Set mac_addresses from inventory for PXE configuration
+  tags: never,deploy
+  vars:
+    pxe_mac_address: "{{ hostvars[cobbler_system.name].interfaces.vmnic0.macaddress | d('undefined')}}"
+  set_fact:
+    mac_addresses: "{{ mac_addresses | d([]) + [{ 'name': cobbler_system.name, 'mac_address': pxe_mac_address | d('undefined') | upper }] }}"
+    path_tftp_boot: "01-{{ (pxe_mac_address | lower)  | replace(\"['\", '') | replace(\"']\", '') | replace(\"', '\", ', ') | replace(':', '-') }}"
+
+- name: Create ESXi loader directory for system {{ cobbler_system.name }}
+  ansible.builtin.file:
+    path: "{{ cobbler_loaders_dir }}/esxi/system/{{ path_tftp_boot }}"
+    state: directory
+    mode: '0755'
+
+- name: Check if bootloader files exists
+  tags: never,deploy
+  stat:
+    path: "{{ cobbler_tftpboot_location }}/esxi/system/{{ path_tftp_boot }}/{{ item }}"
+  register: file_checks
+  with_items:
+    - "bootx64.efi"
+    - "crypto64.efi"
+    - "mboot.efi"
+
+- name: Get Cobbler distro name from profile for system {{ cobbler_system.name }}
+  ansible.builtin.shell:  
+    cmd: "cobbler profile report --name {{ cobbler_system.profile }} | grep Distribution"
+  register: cobbler_distro_output
+  changed_when: false
+  failed_when: cobbler_distro_output.rc != 0
+
+- name: Debug cobbler_distro_output
+  ansible.builtin.debug: 
+    var: cobbler_distro_output.stdout
+
+- name: Store Cobbler distro_name for system {{ cobbler_system.name }}
+  set_fact:
+    system: "{{ cobbler_system | combine({'distro': (cobbler_distro_output.stdout 
+                          | regex_search('Distribution\\s*:\\s*(\\S+)', '\\1') 
+                          | first 
+                          | default('unknown', true))}, recursive=True) }}"
+  when: cobbler_distro_output.rc == 0
+
+- name: Debug cobbler_system.distro
+  ansible.builtin.debug:
+    var: system
+
+- name: Get Cobbler distro metadata
+  ansible.builtin.shell:
+    cmd: "cobbler distro report --name {{ system.distro }} | grep Automatic"
+  register: cobbler_distro_metadata
+  changed_when: false
+  failed_when: cobbler_distro_metadata.rc != 0 or system.distro == 'unknown'
+  when: system.distro != 'unknown'
+
+- name: Extract ESXi Build version
+  set_fact:
+    system: "{{ system | combine({'distro_build': (cobbler_distro_metadata.stdout | regex_search(\"iso_file': '([^']+)\", '\\1') | first | regex_replace('VMware-ESXi-(.*)\\.iso$', '\\1') | default('unknown', true))}, recursive=True) }}"
+    
+- name: Copy bootloader files to the directory for {{ cobbler_system.name }} (if they don't exist)
+  tags: never,deploy
+  become: true
+  ansible.builtin.copy:
+    src: "{{ cobbler_loaders_dir }}/esxi/{{ item.item }}"
+    dest: "{{ cobbler_loaders_dir }}/esxi/system/{{ path_tftp_boot }}/{{ item.item }}"
+    mode: '644'  
+  when: not item.stat.exists
+  with_items: "{{ file_checks.results }}"
+
+- name: Check if the boot.cfg file already exist
+  tags: never,deploy
+  ansible.builtin.stat:
+    path: "{{ cobbler_loaders_dir }}/esxi/system/{{ path_tftp_boot }}/boot.cfg"
+  register: file_check
+
+- name: Deploy ESXi 7.0 boot configuration template for {{ cobbler_system.name }} 
+  ansible.builtin.template:
+    src: boot_loader_conf/bootcfg_esxi70.template.j2
+    dest: "{{ cobbler_loaders_dir }}/esxi/system/{{ path_tftp_boot }}/boot.cfg"
+    owner: root
+    group: root
+    mode: '0644'
+  when: not file_check.stat.exists
+
+- name: Set Cobbler DHCP bootloader override for {{ cobbler_system.name }}
+  ansible.builtin.shell:
+    cmd: "cobbler system edit --name {{ system.name }} --filename=/esxi/system/{{ path_tftp_boot }}/mboot.efi"
+  register: cobbler_distro_metadata
+  changed_when: false
+  failed_when: cobbler_distro_metadata.rc != 0 or system.distro == 'unknown'
+  when: system.distro != 'unknown'

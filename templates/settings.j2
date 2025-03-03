@@ -1,9 +1,14 @@
 {{ ansible_managed | comment }}
 
-allow_duplicate_hostnames: {{ cobbler_allow_duplicate_hostnames | bool }}
+{% if (cobbler_version | first)  is version('3.3', '>=') %}
+auto_migrate_settings: False
+{% endif %}
+
+
 allow_duplicate_ips: {{ cobbler_allow_duplicate_ips | bool }}
 allow_duplicate_macs: {{ cobbler_allow_duplicate_macs | bool }}
 allow_dynamic_settings: {{ cobbler_allow_dynamic_settings | bool }}
+allow_duplicate_hostnames: {{ cobbler_allow_duplicate_hostnames | bool }}
 
 anamon_enabled: {{ cobbler_anamon_enabled | bool }}
 
@@ -12,10 +17,103 @@ auth_token_expiration: {{ cobbler_auth_token_expiration }}
 
 autoinstall_snippets_dir: {{ cobbler_autoinstall_snippets_dir }}
 autoinstall_templates_dir: {{ cobbler_autoinstall_templates_dir }}
+{% if (cobbler_version | first)  is version('3.3', '<') %}
 default_autoinstall: {{ cobbler_default_autoinstall }}
-
+{% else %}
+autoinstall: {{ cobbler_autoinstall }}
+{% endif %}
 boot_loader_conf_template_dir: {{ cobbler_boot_loader_conf_template_dir }}
-
+{% if (cobbler_version | first)  is version('3.3', '>=') %}
+bootloaders_dir: {{ cobbler_loaders_dir }}
+bootloaders_formats:
+  aarch64:
+    binary_name: grubaa64.efi
+  arm:
+    binary_name: bootarm.efi
+  arm64-efi:
+    binary_name: grubaa64.efi
+    extra_modules:
+      - efinet
+  i386-efi:
+    binary_name: bootia32.efi
+  i386-pc-pxe:
+    binary_name: grub.0
+    mod_dir: i386-pc
+    extra_modules:
+      - chain
+      - pxe
+      - biosdisk
+  i686:
+    binary_name: bootia32.efi
+  IA64:
+    binary_name: bootia64.efi
+  powerpc-ieee1275:
+    binary_name: grub.ppc64le
+    extra_modules:
+      - net
+      - ofnet
+  x86_64-efi:
+    binary_name: grubx64.efi
+    extra_modules:
+      - chain
+      - efinet
+bootloaders_modules:
+  - btrfs
+  - ext2
+  - xfs
+  - jfs
+  - reiserfs
+  - all_video
+  - boot
+  - cat
+  - configfile
+  - echo
+  - fat
+  - font
+  - gfxmenu
+  - gfxterm
+  - gzio
+  - halt
+  - iso9660
+  - jpeg
+  - linux
+  - loadenv
+  - minicmd
+  - normal
+  - part_apple
+  - part_gpt
+  - part_msdos
+  - password_pbkdf2
+  - png
+  - reboot
+  - search
+  - search_fs_file
+  - search_fs_uuid
+  - search_label
+  - sleep
+  - test
+  - "true"
+  - video
+  - mdraid09
+  - mdraid1x
+  - lvm
+  - serial
+  - regexp
+  - tr
+  - tftp
+  - http
+  - luks
+  - gcry_rijndael
+  - gcry_sha1
+  - gcry_sha256
+syslinux_dir: '/usr/share/syslinux'
+syslinux_memdisk_folder: '/usr/share/syslinux'
+syslinux_pxelinux_folder: '/usr/share/syslinux'
+grub2_mod_dir: '/usr/lib/grub'
+bootloaders_shim_folder: '/boot/efi/EFI/*/'
+bootloaders_shim_file: 'shim[a-zA-Z0-9]*\.efi'
+bootloaders_ipxe_folder: '/usr/share/ipxe/'
+{% endif %}
 build_reporting_enabled: {{ cobbler_build_reporting_enabled | bool }}
 build_reporting_sender: {{ cobbler_build_reporting_sender }}
 build_reporting_email:
@@ -24,9 +122,9 @@ build_reporting_smtp_server: {{ cobbler_build_reporting_smtp_server }}
 build_reporting_subject: {{ cobbler_build_reporting_subject }}
 build_reporting_ignorelist:
 {{ cobbler_build_reporting_ignorelist | to_nice_yaml | indent(width=2, first=True) }}
-
+{% if (cobbler_version | first)  is version('3.3', '<') %}
 cache_enabled: {{ cobbler_cache_enabled }}
-
+{% endif %}
 cheetah_import_whitelist:
 {{ cobbler_cheetah_import_whitelist | to_nice_yaml | indent(width=2, first=True) }}
 
@@ -49,7 +147,11 @@ default_virt_file_size: {{ cobbler_default_virt_file_size}}
 default_virt_ram: {{ cobbler_default_virt_ram }}
 default_virt_type: {{ cobbler_default_virt_type }}
 
+{% if (cobbler_version | first)  is version('3.3', '<') %}
 enable_gpxe: {{ cobbler_enable_gpxe | bool }}
+{% else %}
+enable_ipxe: {{ cobbler_enable_ipxe | bool }}
+{% endif %}
 
 enable_menu: {{ cobbler_enable_menu | bool }}
 
@@ -70,6 +172,11 @@ ldap_search_prefix: {{ cobbler_ldap_search_prefix }}
 ldap_tls_cacertfile: {{ cobbler_ldap_tls_cacertfile }}
 ldap_tls_keyfile: {{ cobbler_ldap_tls_keyfile }}
 ldap_tls_certfile: {{ cobbler_ldap_tls_certfile}}
+{% if (cobbler_version | first)  is version('3.3', '>=') %}
+ldap_tls_cacertdir: ''
+ldap_tls_cipher_suite: ''
+ldap_tls_reqcert: ''
+{% endif %}
 
 mgmt_classes:
 {{ cobbler_mgmt_classes | to_nice_yaml | indent(width=2, first=True) }}
@@ -80,25 +187,50 @@ puppet_auto_setup: {{ cobbler_puppet_auto_setup | bool }}
 sign_puppet_certs_automatically: {{ cobbler_sign_puppet_certs_automatically | bool }}
 puppetca_path: {{ cobbler_puppetca_path }}
 remove_old_puppet_certs_automatically: {{ cobbler_remove_old_puppet_certs_automatically | bool }}
+{% if (cobbler_version | first)  is version('3.3', '>=') %}
+puppet_server: ""
+puppet_version: 2
+{% endif %}
 puppet_parameterized_classes: {{ cobbler_puppet_parameterized_classes | bool }}
 
 manage_dhcp: {{ cobbler_manage_dhcp | bool }}
+{% if (cobbler_version | first)  is version('3.3', '>=') %}
+manage_dhcp_v6: false
+manage_dhcp_v4: true
+{% endif %}
+
+
+{% if (cobbler_version | first)  is version('3.3', '<') %}
+next_server: {{ cobbler_next_server }}
+{% else %}
+next_server_v4: {{ cobbler_next_server }}
+next_server_v6: "::1"
+{% endif %}
 
 manage_dns: {{ cobbler_manage_dns | bool }}
 bind_chroot_path: {{ cobbler_bind_chroot_path }}
+{% if (cobbler_version | first)  is version('3.3', '>=') %}
+bind_zonefile_path: "/var/named"
+{% endif %}
 bind_master: {{ cobbler_bind_master }}
-
-manage_tftpd: {{ cobbler_manage_tftpd | bool }}
-tftpboot_location: {{ cobbler_tftpboot_location }}
-
-manage_rsync: {{ cobbler_manage_rsync | bool }}
 
 manage_forward_zones:
 {{ cobbler_manage_forward_zones | to_nice_yaml | indent(width=2, first=True) }}
 manage_reverse_zones:
 {{ cobbler_manage_reverse_zones | to_nice_yaml | indent(width=2, first=True) }}
 
-next_server: {{ cobbler_next_server }}
+manage_tftpd: {{ cobbler_manage_tftpd | bool }}
+tftpboot_location: {{ cobbler_tftpboot_location }}
+
+{% if (cobbler_version | first)  is version('3.3', '>=') %}
+grubconfig_dir: "/var/lib/cobbler/grub_config"
+{% endif %}
+
+manage_rsync: {{ cobbler_manage_rsync | bool }}
+
+
+
+
 
 power_management_default_type: {{ cobbler_power_management_default_type }}
 
@@ -106,8 +238,9 @@ pxe_just_once: {{ cobbler_pxe_just_once | bool }}
 nopxe_with_triggers: {{ cobbler_nopxe_with_triggers | bool }}
 
 redhat_management_server: {{ cobbler_redhat_management_server }}
-redhat_management_key: {{ cobbler_redhat_management_key }}
 redhat_management_permissive: {{ cobbler_redhat_management_permissive | bool }}
+redhat_management_key: {{ cobbler_redhat_management_key }}
+
 
 register_new_installs: {{ cobbler_register_new_installs | bool }}
 
@@ -119,11 +252,13 @@ restart_dhcp: {{ cobbler_restart_dhcp | bool }}
 
 run_install_triggers: {{ cobbler_run_install_triggers | bool }}
 
-server: {{ cobbler_server }}
 
-{% if cobbler_signatures_url is defined %}
-signature_url: {{ cobbler_signatures_url }}
-{% endif %}
+scm_track_enabled: {{ cobbler_scm_track_enabled | bool }}
+scm_track_mode: {{ cobbler_scm_track_mode }}
+scm_track_author: {{ cobbler_scm_track_author }}
+scm_push_script: {{ cobbler_scm_push_script }}
+
+server: {{ cobbler_server }}
 
 client_use_localhost: {{ cobbler_client_use_localhost | bool }}
 client_use_https: {{ cobbler_client_use_https | bool }}
@@ -142,6 +277,10 @@ yumdownloader_flags: {{ cobbler_yumdownloader_flags }}
 
 serializer_pretty_json: {{ cobbler_serializer_pretty_json | bool }}
 
+{% if (cobbler_version | first)  is version('3.3', '>=') %}
+cobbler_master: ""
+{% endif %}
+
 replicate_rsync_options: {{ cobbler_replicate_rsync_options }}
 replicate_repo_rsync_options: {{ cobbler_replicate_repo_rsync_options }}
 
@@ -150,10 +289,22 @@ always_write_dhcp_entries: {{ cobbler_always_write_dhcp_entries | bool }}
 proxy_url_ext: {{ (cobbler_proxy_url_ext | length > 0) | ternary(cobbler_proxy_url_ext, "\"\"") }}
 proxy_url_int: {{ cobbler_proxy_url_int }}
 
-scm_track_enabled: {{ cobbler_scm_track_enabled | bool }}
-scm_track_mode: {{ cobbler_scm_track_mode }}
-scm_track_author: {{ cobbler_scm_track_author }}
-scm_push_script: {{ cobbler_scm_push_script }}
+{% if (cobbler_version | first)  is version('3.3', '>=') %}
+jinja2_includedir: "/var/lib/cobbler/jinja2"
+
+convert_server_to_ip: false
+
+buildisodir: "/var/cache/cobbler/buildiso"
+
+iso_template_dir: "/etc/cobbler/iso"
+
+
+{% endif %}
+
+signature_path: "/var/lib/cobbler/distro_signatures.json"
+{% if cobbler_signatures_url is defined %}
+signature_url: {{ cobbler_signatures_url }}
+{% endif %}
 
 include:
 {{ cobbler_include | to_nice_yaml | indent(width=2, first=True) }}

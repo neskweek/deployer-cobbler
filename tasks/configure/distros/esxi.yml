@@ -1,0 +1,58 @@
+- name: Create ESXi loader directory
+  ansible.builtin.file:
+    path: "{{ cobbler_loaders_dir }}/esxi"
+    state: directory
+    mode: '0755'
+
+- name: Copy pxelinux.0 to ESXi loader directory
+  ansible.builtin.copy:
+    src: /usr/share/syslinux/pxelinux.0
+    dest: "{{ cobbler_loaders_dir }}/esxi/pxelinux.0"
+    remote_src: yes
+
+- name: Set permissions to 644 for pxelinux.0
+  ansible.builtin.file:
+    path: "{{ cobbler_loaders_dir }}/esxi/pxelinux.0"
+    mode: '0644'
+
+- name: Copy bootx64.efi
+  ansible.builtin.copy:
+    src: "{{ cobbler_iso_mount_dir }}/{{ cobbler_distro.artifact.file }}/efi/boot/bootx64.efi"
+    dest: "{{ cobbler_loaders_dir }}/esxi/bootx64.efi"
+    remote_src: yes
+
+- name: Set permissions to 644 for bootx64.efi
+  ansible.builtin.file:
+    path: "{{ cobbler_loaders_dir }}/esxi/bootx64.efi"
+    mode: '0644'
+
+- name: Copy bootx64.efi as mboot.efi
+  ansible.builtin.copy:
+    src: "{{ cobbler_iso_mount_dir }}/{{ cobbler_distro.artifact.file }}/efi/boot/bootx64.efi"
+    dest: "{{ cobbler_loaders_dir }}/esxi/mboot.efi"
+    remote_src: yes
+
+- name: Set permissions to 644 for mboot.efi
+  ansible.builtin.file:
+    path: "{{ cobbler_loaders_dir }}/esxi/mboot.efi"
+    mode: '0644'
+
+- name: Copy crypto64.efi to ESXi loader directory
+  ansible.builtin.copy:
+    src: "{{ cobbler_iso_mount_dir }}/{{ cobbler_distro.artifact.file }}/efi/boot/crypto64.efi"
+    dest: "{{ cobbler_loaders_dir }}/esxi/crypto64.efi"
+    remote_src: yes
+
+- name: Set permissions to 644 for crypto64.efi
+  ansible.builtin.file:
+    path: "{{ cobbler_loaders_dir }}/esxi/crypto64.efi"
+    mode: '0644'
+
+
+####
+### TODO : CAN'T FIND WHERE THIS FILE  GETS CREATED IN THE FIRST PLACE
+####
+- name: Remove Cobbler boot configuration file
+  file:
+    path: "{{ cobbler_tftpboot_location }}/images/{{ cobbler_distro.name }}/cobbler-boot.cfg"
+    state: absent

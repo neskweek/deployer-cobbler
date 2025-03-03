@@ -30,6 +30,8 @@
       loop_control:
         loop_var: cobbler_iso_file
         label: "{{ cobbler_iso_file | basename }}"
+      tags:
+        - delete_isos
 
     - name: Delete distros ISO files directories
       file:
@@ -38,6 +40,8 @@
       loop: "{{ cobbler_search_iso_tmp_dirs_result.stdout_lines }}"
       loop_control:
         loop_var: cobbler_iso_tmp_dir
+      tags:
+        - delete_isos
 
     - name: Delete distros to be updated or not found in inventory
       command: >-
@@ -66,6 +70,13 @@
                | selectattr('state', 'equalto', 'absent')
                | map(attribute='name')
                | list }}
+
+    - name: Debug each cobbler_saved_distro entry
+      debug:
+        var: cobbler_saved_distro
+      loop: "{{ _cobbler_saved_distros.values() | list }}"
+      loop_control:
+        loop_var: cobbler_saved_distro
 
     - include_tasks: read.yml
       when:

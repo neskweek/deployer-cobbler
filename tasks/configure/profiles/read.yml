@@ -10,8 +10,6 @@
 
     - name: Read profiles config files
       shell: "cat {{ cobbler_profile_config_file }} 2>/dev/null || echo ''"
-      args:
-        warn: no
       register: cobbler_read_profiles_config_result
       changed_when: no
       loop: >-
@@ -24,8 +22,6 @@
 
     - name: Read profiles autoinstall files
       shell: "cat {{ cobbler_autoinstall_file_path }} 2>/dev/null || echo ''"
-      args:
-        warn: no
       register: cobbler_read_autoinstalls_result
       failed_when: no
       changed_when: no

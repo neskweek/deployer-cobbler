@@ -21,9 +21,7 @@
       register: cobbler_search_distro_config_files_result
 
     - name: Read distros config files
-      shell: "cat {{ cobbler_distro_config_file }} 2>/dev/null || echo ''"
-      args:
-        warn: no
+      ansible.builtin.shell: "cat {{ cobbler_distro_config_file }} 2>/dev/null || echo ''"
       register: cobbler_read_distros_config_result
       changed_when: no
       loop: >-

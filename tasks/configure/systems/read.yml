@@ -10,8 +10,6 @@
 
     - name: Read systems config files
       shell: "cat {{ cobbler_system_config_file }} 2>/dev/null || echo ''"
-      args:
-        warn: no
       register: cobbler_read_systems_config_result
       changed_when: no
       loop: >-
